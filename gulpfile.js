@@ -72,18 +72,8 @@ gulp.task('bundleJs', function () {
     .pipe(gulp.dest('build/'));
 });
 
-gulp.task('copy-assets', function () {
-  return gulp.src('src/assets/**/*').pipe(gulp.dest('build/assets'));
-});
+// gulp.task('copy-assets', function () {
+//   return gulp.src('src/assets/**/*').pipe(gulp.dest('build/assets'));
+// });
 
-gulp.task(
-  'default',
-  gulp.series('clean', 'minifyPlugin', 'bundleJs', 'copy-assets'),
-);
-
-gulp.task('watch', function () {
-  gulp.watch(
-    ['src/app/**/*', 'src/web-component/**/*'],
-    gulp.series('minifyPlugin', 'bundleJs', 'copy-assets'),
-  );
-});
+gulp.task('default', gulp.series('clean', 'minifyPlugin', 'bundleJs'));

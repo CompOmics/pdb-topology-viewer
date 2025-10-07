@@ -45,7 +45,7 @@ const pluginConfig = {
       },
       {
         test: /\.(png|jpg|jpeg|svg|webp)$/i,
-        type: 'asset/resource',
+        type: 'asset/inline',
       },
     ],
   },

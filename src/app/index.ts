@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import logo from '../assets/logo.webp';
 
 class PdbTopologyViewerPlugin {
   defaultColours = {
@@ -943,7 +944,7 @@ class PdbTopologyViewerPlugin {
     this.targetEle.innerHTML = `<div style="${this.displayStyle}">
             <div class="svgSection" style="position:relative;width:100%;"></div>
             <div style="${this.menuStyle}">
-                <img src="build/assets/logo.webp" style="height:15px; width: 15px; border:0;position: absolute;margin-top: 11px;" />
+                <img src="${logo}" style="height:15px; width: 15px; border:0;position: absolute;margin-top: 11px;" />
                 <a style="color: #efefef;border-bottom:none; cursor:pointer;margin-left: 20px;" target="_blank" href="https://pdbe.org/${
                   this.entryId
                 }">${this.entryId}</a> | <span class="menuDesc">Entity ${
