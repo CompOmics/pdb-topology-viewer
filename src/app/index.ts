@@ -49,6 +49,7 @@ class PdbTopologyViewerPlugin {
       errorStyle?: string;
       menuStyle?: string;
     },
+    apiData?: any[],
   ) {
     if (
       options &&
@@ -87,45 +88,43 @@ class PdbTopologyViewerPlugin {
           typeof result[this.entryId][this.entityId] != 'undefined'
         ) {
           this.chainId = result[this.entryId][this.entityId][0].chain_id;
-          this.initPainting();
+          this.initPainting(apiData);
         } else {
           this.displayError();
         }
       });
     } else {
       this.chainId = options.chainId;
-      this.initPainting();
+      this.initPainting(apiData);
     }
   }
 
-  initPainting() {
-    this.getApiData(this.entryId, this.chainId).then((result) => {
-      if (result) {
-        //Validate required data in the API result set (0, 2, 4)
-        if (
-          typeof result[0] == 'undefined' ||
-          typeof result[2] == 'undefined' ||
-          typeof result[4] == 'undefined'
-        ) {
-          this.displayError();
-          return;
-        }
+  async initPainting(apiData?: any[]): Promise<void> {
+    const data = apiData ?? (await this.getApiData(this.entryId, this.chainId));
 
-        this.apiData = result;
-        //default pdb events
-        this.pdbevents = this.createNewEvent([
-          'PDB.topologyViewer.click',
-          'PDB.topologyViewer.mouseover',
-          'PDB.topologyViewer.mouseout',
-        ]);
-        this.getPDBSequenceArray(this.apiData[0][this.entryId]);
-        this.drawTopologyStructures();
-        this.createDomainDropdown();
+    if (!data) return;
 
-        if (this.subscribeEvents) this.subscribeWcEvents();
-      } else {
-      }
-    });
+    if (!data[0] || !data[2] || !data[4]) {
+      this.displayError();
+      return;
+    }
+
+    this.apiData = data;
+
+    // Initialize PDB events once
+    this.pdbevents = this.createNewEvent([
+      'PDB.topologyViewer.click',
+      'PDB.topologyViewer.mouseover',
+      'PDB.topologyViewer.mouseout',
+    ]);
+
+    // Prepare topology
+    this.getPDBSequenceArray(this.apiData[0][this.entryId]);
+    this.drawTopologyStructures();
+    this.createDomainDropdown();
+
+    // Optionally subscribe to events
+    if (this.subscribeEvents) this.subscribeWcEvents();
   }
 
   displayError(errType?: string) {
