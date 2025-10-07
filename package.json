@@ -25,12 +25,7 @@
     "build": "npm run build-tsc && npm run build-webpack && npm run bundle-package",
     "build-webpack": "webpack --config webpack.config.js --mode production",
     "build-tsc": "tsc",
-    "bundle-package": "gulp",
-    "dev": "npm run build-dev && npm run watch",
-    "watch": "npm run watch-tsc & npm run watch-webpack & npm run watch-gulp",
-    "watch-tsc": "tsc --watch",
-    "watch-webpack": "webpack --config webpack.config.js --watch --mode development",
-    "watch-gulp": "gulp watch"
+    "bundle-package": "gulp"
   },
   "author": {
     "name": "Mandar Deshpande",
