@@ -1,6 +1,6 @@
 {
   "name": "pdb-topology-viewer",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "The topology viewer depicts the secondary structure of a protein in a 2D representation, taking into account the interactions of these secondary structure elements. This leads to a consistent display of sheets and domains in the structure. For PDB entries with multiple copies of a protein, the best chain is used. The topology viewer also depicts value-added annotation from SIFTS including residue-level mapping to UniProt, sequence families (Pfam), structure domains (SCOP, CATH) and structure quality from wwPDB validation reports.",
   "keywords": [
     "BioJS",
@@ -19,12 +19,18 @@
   },
   "scripts": {
     "test": "echo 'Error: no test specified' && exit 1",
+    "serve": "npm run build && http-server -p 1338",
     "build-dev": "npm run build-tsc && npm run build-webpack-dev && npm run bundle-package",
     "build-webpack-dev": "webpack --mode development",
     "build": "npm run build-tsc && npm run build-webpack && npm run bundle-package",
-    "build-webpack": "webpack --mode production",
+    "build-webpack": "webpack --config webpack.config.js --mode production",
     "build-tsc": "tsc",
-    "bundle-package": "gulp"
+    "bundle-package": "gulp",
+    "dev": "npm run build-dev && npm run watch",
+    "watch": "npm run watch-tsc & npm run watch-webpack & npm run watch-gulp",
+    "watch-tsc": "tsc --watch",
+    "watch-webpack": "webpack --config webpack.config.js --watch --mode development",
+    "watch-gulp": "gulp watch"
   },
   "author": {
     "name": "Mandar Deshpande",
@@ -36,17 +42,20 @@
     "@babel/plugin-transform-runtime": "^7.6.2",
     "@babel/preset-env": "^7.12.1",
     "@babel/runtime": "^7.7.2",
+    "@types/node": "^24.7.0",
     "babel-loader": "^8.0.6",
     "css-loader": "^3.2.0",
-    "d3": "^5.15.0",
+    "d3": "^6.7.0",
     "del": "^5.1.0",
     "gulp": "^4.0.2",
     "gulp-concat": "^2.6.1",
     "gulp-header": "^2.0.9",
+    "gulp-terser": "^2.1.0",
     "gulp-uglify": "^3.0.2",
-    "typescript": "^3.7.4",
-    "webpack": "^4.41.5",
-    "webpack-cli": "^3.3.10"
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "webpack": "^5.102.0",
+    "webpack-cli": "^5.1.4"
   },
   "dependencies": {
     "@types/d3": "^5.0.1"
