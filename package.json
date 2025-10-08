@@ -31,6 +31,12 @@
     "name": "Mandar Deshpande",
     "email": "mandar@ebi.ac.uk"
   },
+  "contributors": [
+    {
+      "name": "Dare Lawal",
+      "email": "lawal@ebi.ac.uk"
+    }
+  ],
   "license": "Apache-2.0",
   "devDependencies": {
     "@babel/core": "^7.1.5",
