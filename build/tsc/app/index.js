@@ -11,12 +11,17 @@ class PdbTopologyViewerPlugin {
             qualityYellow: 'rgb(364.2857142857143,364.2857142857143,75.71428571428572)',
             qualityOrange: 'rgb(291.42857142857144,121.42857142857143,0)',
         };
-        this.displayStyle = 'border:1px solid #696969;';
+        this.displayStyle = 'border:1px solid #696969; height: 100%; width: 100%;';
         this.errorStyle = 'border:1px solid #696969; height:54%; padding-top:46%; text-align:center; font-weight:bold;';
         this.menuStyle = 'position:relative;height:38px;line-height:38px;background-color:#696969;padding: 0 10px;font-size:16px; color: #efefef;';
         this.svgWidth = 100;
         this.svgHeight = 100;
         this.subscribeEvents = true;
+        this.autoResize = true;
+        this.previousHeight = 0;
+        this.previousWidth = 0;
+        this.resizeTimeout = null;
+        this.resizeDebounceMs = 150; // tweak if needed
         this.createNewEvent = function (eventTypeArr) {
             let eventObj = {};
             eventTypeArr.forEach((eventType, index) => {
@@ -120,6 +125,8 @@ class PdbTopologyViewerPlugin {
         }
         if (options.subscribeEvents == false)
             this.subscribeEvents = false;
+        if (options.autoResize == false)
+            this.autoResize = false;
         this.entityId = options.entityId;
         this.entryId = options.entryId.toLowerCase();
         //If chain id is not provided then get best chain id from observed residues api
@@ -141,6 +148,41 @@ class PdbTopologyViewerPlugin {
             this.initPainting(apiData);
         }
     }
+    debouncedResize() {
+        clearTimeout(this.resizeTimeout);
+        this.resizeTimeout = setTimeout(() => {
+            this.resize();
+        }, this.resizeDebounceMs);
+    }
+    resize() {
+        if (!this.targetEle)
+            return;
+        const newWidth = this.targetEle.offsetWidth;
+        const newHeight = this.targetEle.offsetHeight;
+        if (newHeight === this.previousHeight &&
+            newWidth === this.previousWidth)
+            return;
+        this.previousHeight = newHeight;
+        this.previousWidth = newWidth;
+        // Remember current dropdown selection
+        const selectBoxEle = this.targetEle.querySelector('.menuSelectbox');
+        const selectedIndex = selectBoxEle ? selectBoxEle.selectedIndex : 0;
+        // Redraw structure + dropdown
+        this.drawTopologyStructures();
+        this.createDomainDropdown();
+        // Dispatch the zoom event manually with the current transform
+        const svgNode = this.svgEle.node();
+        if (!svgNode)
+            return;
+        const currentTransform = d3.zoomTransform(svgNode);
+        this.svgEle.transition().duration(0).call(this.zoom.transform, currentTransform);
+        if (this.domainTypes && this.domainTypes[selectedIndex]) {
+            const newSelectBox = this.targetEle.querySelector('.menuSelectbox');
+            if (newSelectBox)
+                newSelectBox.selectedIndex = selectedIndex;
+            this.displayDomain();
+        }
+    }
     async initPainting(apiData) {
         const data = apiData !== null && apiData !== void 0 ? apiData : (await this.getApiData(this.entryId, this.chainId));
         if (!data)
@@ -160,6 +202,13 @@ class PdbTopologyViewerPlugin {
         this.getPDBSequenceArray(this.apiData[0][this.entryId]);
         this.drawTopologyStructures();
         this.createDomainDropdown();
+        // Add a resize observer to fix dynamic container size issues
+        if (this.autoResize) {
+            const resizeObserver = new ResizeObserver(() => {
+                this.debouncedResize();
+            });
+            resizeObserver.observe(this.targetEle);
+        }
         // Optionally subscribe to events
         if (this.subscribeEvents)
             this.subscribeWcEvents();
@@ -851,7 +900,7 @@ class PdbTopologyViewerPlugin {
         //Add container elements
         this.targetEle.innerHTML = `<div style="${this.displayStyle}">
             <div class="svgSection" style="position:relative;width:100%;"></div>
-            <div style="${this.menuStyle}">
+            <div class="menuContainer" style="${this.menuStyle}">
                 <img src="${logo}" style="height:15px; width: 15px; border:0;position: absolute;margin-top: 11px;" />
                 <a style="color: #efefef;border-bottom:none; cursor:pointer;margin-left: 20px;" target="_blank" href="https://pdbe.org/${this.entryId}">${this.entryId}</a> | <span class="menuDesc">Entity ${this.entityId} | Chain ${this.chainId.toUpperCase()}</span>
                 <div class="menuOptions" style="float:right;margin-right: 20px;">
@@ -877,21 +926,27 @@ class PdbTopologyViewerPlugin {
         //Set svg dimensions
         const svgHt = svgSectionHt - 20;
         const svgWt = svgSectionWt - 5;
-        svgSection.innerHTML = `<svg class="topoSvg" preserveAspectRatio="xMidYMid meet" viewBox="0 0 100 100" style="width:${svgWt}px;height:${svgHt}px;margin:10px 0;"></svg>`;
+        svgSection.innerHTML = `
+      <svg class="topoSvg"
+           preserveAspectRatio="xMidYMid meet"
+           viewBox="0 0 100 100"
+           style="width:${svgWt}px;height:${svgHt}px;margin:10px 0;">
+      </svg>`;
         this.svgEle = d3.select(this.targetEle).select('.topoSvg');
         this.getDomainRange();
         this.scaledPointsArr = [];
         this.svgEle.call(this.zoom).on('contextmenu', function (event) {
             event.preventDefault();
         }); //add zoom event and block right click event
-        const topologyData = this.apiData[2][this.entryId][this.entityId][this.chainId];
+        const topologyData = JSON.parse(JSON.stringify(this.apiData[2][this.entryId][this.entityId][this.chainId]));
         for (let secStrType in topologyData) {
             // angular.forEach(this.apiResult.data[_this.entryId].topology[scope.entityId][scope.bestChainId], function(secStrArr, secStrType) {
             const secStrArr = topologyData[secStrType];
             if (!secStrArr)
                 return;
             //iterating on secondary str data array
-            secStrArr.forEach((secStrData, secStrDataIndex) => {
+            for (let secStrDataIndex = 0; secStrDataIndex < secStrArr.length; secStrDataIndex++) {
+                let secStrData = secStrArr[secStrDataIndex];
                 if (typeof secStrData.path !== 'undefined' &&
                     secStrData.path.length > 0) {
                     if (secStrType === 'terms') {
@@ -901,25 +956,25 @@ class PdbTopologyViewerPlugin {
                         let curveYdiff = 0;
                         //modify helices path data to create a capsule like structure
                         if (secStrType === 'helices') {
-                            const curveCenter = secStrData.path[0] +
-                                (secStrData.path[2] - secStrData.path[0]) / 2;
+                            const origPath = [...secStrData.path]; // clone so you don’t destroy original
+                            const curveCenter = origPath[0] + (origPath[2] - origPath[0]) / 2;
                             curveYdiff = 2 * (secStrData.minoraxis * 1.3);
-                            if (secStrData.path[1] > secStrData.path[3]) {
+                            if (origPath[1] > origPath[3]) {
                                 curveYdiff = -2 * (secStrData.minoraxis * 1.3);
                             }
                             const newPathCords = [
-                                secStrData.path[0],
-                                secStrData.path[1],
+                                origPath[0],
+                                origPath[1],
                                 curveCenter,
-                                secStrData.path[1] - curveYdiff,
-                                secStrData.path[2],
-                                secStrData.path[1],
-                                secStrData.path[2],
-                                secStrData.path[3],
+                                origPath[1] - curveYdiff,
+                                origPath[2],
+                                origPath[1],
+                                origPath[2],
+                                origPath[3],
                                 curveCenter,
-                                secStrData.path[3] + curveYdiff,
-                                secStrData.path[0],
-                                secStrData.path[3],
+                                origPath[3] + curveYdiff,
+                                origPath[0],
+                                origPath[3],
                             ];
                             secStrData.path = newPathCords;
                         }
@@ -1023,7 +1078,8 @@ class PdbTopologyViewerPlugin {
                         this.scaledPointsArr = []; //empty the arr for next iteration
                     }
                 }
-            });
+            }
+            ;
         }
         //bring rsrz validation circles in front
         this.svgEle
