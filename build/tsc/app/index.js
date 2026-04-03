@@ -5,6 +5,7 @@ class PdbTopologyViewerPlugin {
         this.defaultColours = {
             domainSelection: 'rgb(255,0,0)',
             mouseOver: 'rgb(105,105,105)',
+            selected: 'rgb(0,0,255)',
             borderColor: 'rgb(0,0,0)',
             qualityGreen: 'rgb(0,182.85714285714286,0)',
             qualityRed: 'rgb(291.42857142857144,0,0)',
@@ -459,11 +460,124 @@ class PdbTopologyViewerPlugin {
         }
         dispatchEventElement.dispatchEvent(this.pdbevents[eventType]);
     }
+    getResiduePath(residueNumber) {
+        return this.svgEle.select('.topo_res_' + residueNumber);
+    }
+    isResidueSelected(residueEle) {
+        return residueEle.classed('selectedResidue');
+    }
+    applyRestingResidueStyle(residueEle, residueData) {
+        if (this.isResidueSelected(residueEle)) {
+            this.applySelectedResidueStyle(residueEle, residueData);
+            return;
+        }
+        if (residueEle.classed('coloured')) {
+            const residueColor = residueEle.attr('data-color');
+            residueEle
+                .attr('stroke', function (d) {
+                if (d.type === 'coils') {
+                    return residueColor;
+                }
+                else {
+                    return '#111';
+                }
+            })
+                .attr('stroke-width', function (d) {
+                if (d.type === 'coils') {
+                    return 1;
+                }
+                else {
+                    return 0;
+                }
+            })
+                .attr('stroke-opacity', 1)
+                .attr('fill', function (d) {
+                if (d.type === 'coils') {
+                    return 'none';
+                }
+                else {
+                    return residueColor;
+                }
+            })
+                .attr('fill-opacity', function (d) {
+                if (d.type === 'coils') {
+                    return 0;
+                }
+                else {
+                    return 1;
+                }
+            });
+            return;
+        }
+        if (residueData.type === 'coils') {
+            residueEle
+                .attr('stroke', this.defaultColours.borderColor)
+                .attr('stroke-width', 0.3)
+                .attr('stroke-opacity', 1)
+                .attr('fill', 'none')
+                .attr('fill-opacity', 0);
+        }
+        else {
+            residueEle
+                .attr('stroke', '#111')
+                .attr('stroke-width', 0)
+                .attr('stroke-opacity', 1)
+                .attr('fill', 'white')
+                .attr('fill-opacity', 0);
+        }
+    }
+    applySelectedResidueStyle(residueEle, residueData) {
+        residueEle.classed('selectedResidue', true);
+        if (residueData.type === 'coils') {
+            residueEle
+                .attr('stroke', this.defaultColours.selected)
+                .attr('stroke-width', 2)
+                .attr('stroke-opacity', 1)
+                .attr('fill', 'none')
+                .attr('fill-opacity', 0);
+        }
+        else {
+            residueEle
+                .attr('stroke', this.defaultColours.selected)
+                .attr('stroke-width', 1.2)
+                .attr('stroke-opacity', 1)
+                .attr('fill', this.defaultColours.selected)
+                .attr('fill-opacity', 1);
+        }
+    }
+    clearSelectedResidues(excludedResidueNumber) {
+        const _this = this;
+        this.svgEle.selectAll('.selectedResidue').each(function (d) {
+            if (typeof excludedResidueNumber !== 'undefined' &&
+                d.residue_number === excludedResidueNumber) {
+                return;
+            }
+            const residueEle = d3.select(this);
+            residueEle.classed('selectedResidue', false);
+            _this.applyRestingResidueStyle(residueEle, d);
+        });
+    }
     clickAction(eleObj) {
+        const residueEle = this.getResiduePath(eleObj.residue_number);
+        let isSelected = false;
+        let residueData = eleObj;
+        if (residueEle && residueEle._groups && residueEle._groups[0][0] != null) {
+            residueData = residueEle.data()[0];
+            isSelected = this.isResidueSelected(residueEle);
+            if (isSelected) {
+                residueEle.classed('selectedResidue', false);
+                this.applyRestingResidueStyle(residueEle, residueData);
+            }
+            else {
+                this.clearSelectedResidues(eleObj.residue_number);
+                this.applySelectedResidueStyle(residueEle, residueData);
+            }
+        }
         //Dispatch custom click event
         this.dispatchEvent('PDB.topologyViewer.click', {
             residueNumber: eleObj.residue_number,
-            type: eleObj.type,
+            selected: !isSelected,
+            type: residueData.type,
             entryId: this.entryId,
             entityId: this.entityId,
             chainId: this.chainId,
@@ -475,16 +589,11 @@ class PdbTopologyViewerPlugin {
         //var selectedPathData = selectedPath.data();
         //Show Tooltip
         this.renderTooltip(eleData, 'show', event);
-        //Highlight Residue
-        if (eleData.type === 'strands' || eleData.type === 'helices') {
-            selectedPath
-                .attr('fill', this.defaultColours.mouseOver)
-                .attr('fill-opacity', '0.3');
-        }
-        if (eleData.type === 'coils') {
+        if (!this.isResidueSelected(selectedPath)) {
             selectedPath
                 .attr('stroke', this.defaultColours.mouseOver)
-                .attr('stroke-width', 1);
+                .attr('stroke-width', eleData.type === 'coils' ? 1.2 : 1.2)
+                .attr('stroke-opacity', 1);
         }
         //Dispatch custom mouseover event
         this.dispatchEvent('PDB.topologyViewer.mouseover', {
@@ -497,33 +606,10 @@ class PdbTopologyViewerPlugin {
         });
     }
     mouseoutAction(event, eleObj, eleData) {
-        let mouseOverColor = 'white';
-        let fillOpacity = 0;
-        let strokeOpacity = 0.3;
         const pathElement = d3.select(eleObj);
         //Hide Tooltip
         this.renderTooltip('', 'hide', event);
-        //if path colour is changed then get the colour
-        if (pathElement.classed('coloured')) {
-            mouseOverColor = pathElement.attr('data-color');
-            fillOpacity = 1;
-            strokeOpacity = 1;
-        }
-        else {
-            if (eleData.type === 'coils') {
-                mouseOverColor = this.defaultColours.borderColor;
-            }
-        }
-        if (eleData.type === 'strands' || eleData.type === 'helices') {
-            pathElement
-                .attr('fill', mouseOverColor)
-                .attr('fill-opacity', fillOpacity);
-        }
-        if (eleData.type === 'coils') {
-            pathElement
-                .attr('stroke', mouseOverColor)
-                .attr('stroke-width', strokeOpacity);
-        }
+        this.applyRestingResidueStyle(pathElement, eleData);
         //Dispatch custom mouseover event
         this.dispatchEvent('PDB.topologyViewer.mouseout', {
             entryId: this.entryId,
@@ -1223,10 +1309,16 @@ class PdbTopologyViewerPlugin {
     }
     highlight(startResidue, endResidue, color, eventType) {
         const _this = this;
-        let fill = '#000000';
-        let stroke = '#000000';
-        let strokeWidth = 0.3;
-        let strokeOpacity = 0;
+        let fill = 'none';
+        let fillOpacity = 0;
+        let stroke = this.defaultColours.mouseOver;
+        let strokeWidth = 1.2;
+        let strokeOpacity = 1;
+        if (eventType === 'click') {
+            fill = this.defaultColours.selected;
+            fillOpacity = 1;
+            stroke = this.defaultColours.selected;
+        }
         for (let residueNumber = startResidue; residueNumber <= endResidue; residueNumber++) {
             //get topology residue details
             const residueEle = this.svgEle.select('.topo_res_' + residueNumber);
@@ -1237,21 +1329,26 @@ class PdbTopologyViewerPlugin {
             if (color) {
                 if (typeof color == 'string') {
                     stroke = color;
-                    fill = color;
+                    if (eventType === 'click') {
+                        fill = color;
+                    }
                 }
                 else {
                     stroke = d3.rgb(color.r, color.g, color.b);
-                    fill = d3.rgb(color.r, color.g, color.b);
+                    if (eventType === 'click') {
+                        fill = d3.rgb(color.r, color.g, color.b);
+                    }
                 }
             }
             if (residueEleData[0].type !== 'strands' &&
                 residueEleData[0].type !== 'helices') {
                 fill = 'none';
+                fillOpacity = 0;
                 strokeWidth = 2;
-                strokeOpacity = 0.5;
             }
-            else {
-                stroke = 'none';
+            else if (eventType !== 'click') {
+                fill = 'none';
+                fillOpacity = 0;
             }
             this.svgEle
                 .append('path')
@@ -1266,7 +1363,7 @@ class PdbTopologyViewerPlugin {
             })
                 .attr('d', residueEle.attr('d'))
                 .attr('fill', fill)
-                .attr('fill-opacity', 0.5)
+                .attr('fill-opacity', fillOpacity)
                 .attr('stroke', stroke)
                 .attr('stroke-opacity', strokeOpacity)
                 .attr('stroke-width', strokeWidth)
